@@ -1,0 +1,83 @@
+/**************************************************************************************************
+* eMD’s Billing Report
+* Task- Identify eMD's invoice details with positive Insurance Balance 
+* Part 1 of 2 - Invoice detailed data except notes
+* -------------------------------
+* Created By Ninad Rao: 2018-06-19
+* - 2018-06-22 NR: Added First date and Last date of Insurance claim filed dates
+* - 2018-06-22 NR: Goal - identify claim number that is visible inside the invoice notes. Added part 2 of this code to view invoice notes.
+* - 2018-06-29 NR: Added Invoice Status
+**************************************************************************************************/
+
+SELECT DISTINCT 
+	BI.Invoice_Number
+	, BI.Invoice_StartSerDate AS DOS
+	, BI.Invoice_InsuranceBalance
+	, HC.Person_Name AS Supervising_Provider
+	, FG.FinancialGroup_Code
+	, FG.FinancialGroup_Description
+	, MF.Organization_Name AS Facility
+	, BII.InvoiceIns_PolicyNum
+	, VI.Organization_Name AS Insurance_Company
+	, VP.Person_Name as Patient_Name 
+	,  CASE WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 180 THEN '180+'
+			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 150 THEN '150 - 180'
+			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 120 THEN '120 - 150'
+			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 90 THEN '90 - 120'
+			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 60 THEN '60 - 90'
+			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 30 THEN '30 - 60'
+			ELSE '0 - 30' END AS Bucket
+	, BIS.First_Filed_Date
+	, BIS.Last_Filed_Date
+	, LIS.InvoiceStatus_Code
+	, LIS.InvoiceStatus_Description
+
+FROM [dbo].[BILL_Invoice] AS BI
+ 
+INNER JOIN [dbo].[LKUP_FinancialGroup] AS FG 
+	ON BI.FinancialGroup_ID = FG.FinancialGroup_ID AND FG.FinancialGroup_RecordState <> 1
+
+LEFT JOIN [dbo].[VIEW_MedicalFacility] AS MF 
+	ON BI.MedicalFacility_ID = MF.MedicalFacility_ID AND MF.MedicalFacility_RecordState <> 1
+
+LEFT JOIN [dbo].[VIEW_Provider] AS HC 
+	ON BI.Invoice_SupervisorHealthcare_ID = HC.HealthCare_ID AND HC.HealthCare_RecordState <> 1
+
+INNER JOIN [dbo].[Bill_InvoiceIns] AS BII 
+	ON BI.Invoice_ID = BII.Invoice_ID AND BII.InvoiceIns_RecordState <> 1
+
+INNER JOIN [dbo].[VIEW_Insurance] AS VI 
+	ON BII.Insurance_ID = VI.Insurance_ID AND VI.Insurance_RecordState <> 1
+
+INNER JOIN [dbo].[VIEW_Patient] AS VP 
+	ON BI.Patient_ID = VP.Patient_ID AND VP.Patient_RecordState <> 1
+
+INNER JOIN [dbo].[LKUP_InvoiceStatus] AS LIS 
+	ON BI.InvoiceStatus_ID= LIS.InvoiceStatus_ID AND LIS.InvoiceStatus_RecordState <> 1
+
+LEFT JOIN (
+		SELECT DISTINCT 
+			BN.Invoice_ID
+			, MIN(BN.InvoiceNote_CreateDate) OVER (PARTITION BY BN.Invoice_ID) AS First_Filed_Date
+			, MAX(BN.InvoiceNote_CreateDate) OVER (PARTITION BY BN.Invoice_ID) AS Last_Filed_Date
+			, I.InvoiceStatus_Description
+			, I.InvoiceStatus_Code 
+
+		FROM [dbo].[BILL_InvoiceNote] AS BN 
+
+		INNER JOIN [dbo].[LKUP_InvoiceStatus] AS I 
+			ON BN.InvoiceStatus_ID = I.InvoiceStatus_ID AND I.InvoiceStatus_RecordState <> 1
+
+		WHERE BN.InvoiceNote_RecordState <> 1 
+				AND BN.InvoiceNote_CreateDate > '1/1/2017' 
+				AND I.InvoiceStatus_Code = 'FILED'
+
+		) AS BIS ON BI.Invoice_ID = BIS.Invoice_ID
+
+WHERE BI.Invoice_RecordState <> 1 
+		AND BI.Invoice_StartSerDate >= '1/1/2017' 
+		AND BI.Invoice_InsuranceBalance > 0
+		AND VP.Person_Name NOT LIKE 'Interest%' 
+		AND VP.Person_Name NOT LIKE 'Patient%'
+
+ORDER BY BI.Invoice_Number
