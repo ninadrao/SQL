@@ -11,7 +11,7 @@
 
 SELECT DISTINCT 
 	BI.Invoice_Number
-	, BI.Invoice_StartSerDate AS DOS
+	, BI.Invoice_StartSerDate AS DOS 			-- DOS = Date of Service
 	, BI.Invoice_InsuranceBalance
 	, HC.Person_Name AS Supervising_Provider
 	, FG.FinancialGroup_Code
@@ -20,13 +20,13 @@ SELECT DISTINCT
 	, BII.InvoiceIns_PolicyNum
 	, VI.Organization_Name AS Insurance_Company
 	, VP.Person_Name as Patient_Name 
-	,  CASE WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 180 THEN '180+'
-			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 150 THEN '150 - 180'
-			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 120 THEN '120 - 150'
-			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 90 THEN '90 - 120'
-			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 60 THEN '60 - 90'
-			WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 30 THEN '30 - 60'
-			ELSE '0 - 30' END AS Bucket
+	, CASE  WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 180 THEN '180+'
+		WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 150 THEN '150 - 180'
+		WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 120 THEN '120 - 150'
+		WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 90 THEN '90 - 120'
+		WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 60 THEN '60 - 90'
+		WHEN DATEDIFF(dd, BI.Invoice_StartSerDate, GETDATE()) > 30 THEN '30 - 60'
+		ELSE '0 - 30' END AS Bucket		-- Categorizing all invoices into buckets based on service date
 	, BIS.First_Filed_Date
 	, BIS.Last_Filed_Date
 	, LIS.InvoiceStatus_Code
@@ -77,7 +77,7 @@ LEFT JOIN (
 WHERE BI.Invoice_RecordState <> 1 
 		AND BI.Invoice_StartSerDate >= '1/1/2017' 
 		AND BI.Invoice_InsuranceBalance > 0
-		AND VP.Person_Name NOT LIKE 'Interest%' 
-		AND VP.Person_Name NOT LIKE 'Patient%'
+		AND VP.Person_Name NOT LIKE 'Interest%'			-- Removing dummy/fake patients
+		AND VP.Person_Name NOT LIKE 'Patient%'			-- Removing dummy/fake patients
 
 ORDER BY BI.Invoice_Number
