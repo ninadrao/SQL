@@ -1,0 +1,75 @@
+/**************************************************************************************************
+* Invoice Details (Charges, Payments, Adjustements) 
+* -------------------------------
+*
+* ModBy:  NR 2018-06-25
+**************************************************************************************************/
+
+
+SELECT T1.*, T2.[Ins Payment], T2.[Pat Payment], T2.Payment_Date
+
+-- Table T1 includes invoice details from charged side.
+FROM	
+  ( 
+  SELECT 
+  DATEADD(d,DATEDIFF(d,0,VB.Invoice_Date),0) AS Invoice_Date  -- Coverts time part to 12:00 am
+  , BICPT.InvoiceCPT_Code
+  , BICPT.InvoiceCPT_CodeBillDescription
+  , BICPT.InvoiceCPT_ID, BI.Invoice_Number 
+  , DATEADD(d,DATEDIFF(d,0,A.Appointment_AppStartTime),0) AS Visit_Date -- Coverts time part to 12:00 am
+  , FG.FinancialGroup_Code
+  , FG.FinancialGroup_Description
+  ,	VB.ProviderName AS Provider_Name
+  , MF.Organization_Name as Facility
+  ,	COALESCE( BICPT.InvoiceCPT_ModifierCode1 + ',' , ' ') + COALESCE( BICPT.InvoiceCPT_ModifierCode2 + ',' , ' ') 
+	+ COALESCE( BICPT.InvoiceCPT_ModifierCode3 + ',' , ' ') +  BICPT.InvoiceCPT_ModifierCode4 AS Modifiers -- Concatenate all modifoers separated by comma
+  , (BICPT.InvoiceCPT_UnitFee)  AS Gross_Charges
+  ,	 VB.InsuranceCompName
+
+FROM [dbo].[VIEW_bilInvoice] AS VB
+INNER JOIN [dbo].[Bill_InvoiceCPT] AS BICPT ON VB.Invoice_ID = BICPT.Invoice_ID AND BICPT.InvoiceCPT_RecordState <> 1
+INNER JOIN [dbo].[Bill_Invoice] AS BI ON VB.Invoice_ID = BI.Invoice_ID AND BI.Invoice_RecordState <> 1
+INNER JOIN [dbo].[APP_Appointment] AS A ON BI.Appointment_ID = A.Appointment_ID AND A.Appointment_RecordState <> 1
+INNER JOIN [dbo].[LKUP_FinancialGroup] AS FG ON BI.FinancialGroup_ID = FG.FinancialGroup_ID
+INNER JOIN [dbo].[VIEW_MedicalFacility] AS MF ON BI.MedicalFacility_ID = MF.MedicalFacility_ID AND MF.MedicalFacility_RecordState <> 1
+
+WHERE  VB.Invoice_RecordState <> 1 AND VB.invoice_id <> '0000000000' AND VB.Invoice_Date between '1/1/2017' AND '1/1/2018'  AND VB.InsuranceCompName LIKE 'BCBS%' AND VB.ProviderName LIKE 'Suter, %'
+/*
+GROUP BY DATEADD(YY, DATEDIFF(YY,0, VB.Invoice_Date),0) ,BICPT.InvoiceCPT_Code,  BICPT.InvoiceCPT_ID,
+		VB.ProviderName, VB.InsuranceCompName,
+		BICPT.InvoiceCPT_ModifierCode1, BICPT.InvoiceCPT_ModifierCode2, BICPT.InvoiceCPT_ModifierCode3, BICPT.InvoiceCPT_ModifierCode4 */
+-- Group by was used when charges were summed per invoice, later group by was disabled as all individual charges were required by cpt code.     
+) AS T1 
+
+
+-- Table T1 includes invoice details from payment side.
+INNER JOIN(
+			SELECT DISTINCT 
+      DATEADD(d,DATEDIFF(d,0,VB.Invoice_Date),0) AS Invoice_Date
+      , BICPT.InvoiceCPT_Code
+      , BICPT.InvoiceCPT_ID
+      ,	VB.ProviderName AS Provider_Name
+      , min (DATEADD(d,DATEDIFF(d,0,BP.Payment_DatePosted),0)) over (Partition BY BICPT.Invoice_ID)  AS Payment_Date
+      ,	COALESCE( BICPT.InvoiceCPT_ModifierCode1 + ',' , ' ') + COALESCE( BICPT.InvoiceCPT_ModifierCode2 + ',' , ' ') 
+			+ COALESCE( BICPT.InvoiceCPT_ModifierCode3 + ',' , ' ') +  BICPT.InvoiceCPT_ModifierCode4 AS Modifiers
+      ,	(isnull(CASE WHEN bp.payment_paymentby = 'I' then bd.distribution_payment END,0)) as 'Ins Payment'
+      ,	(isnull(Case WHEN bp.payment_paymentby = 'P' then bd.distribution_payment END,0)) as 'Pat Payment'
+      , VB.InsuranceCompName
+	
+
+			FROM [dbo].[VIEW_bilInvoice] AS VB
+			INNER JOIN [dbo].[Bill_InvoiceCPT] AS BICPT ON VB.Invoice_ID = BICPT.Invoice_ID AND BICPT.InvoiceCPT_RecordState <> 1
+			LEFT JOIN [dbo].[BILL_Distribution] AS BD ON BICPT.InvoiceCPT_ID = BD.InvoiceCPT_ID AND BD.Distribution_RecordState <> 1 AND BD.Distribution_ID  <> '0000000000'
+			LEFT JOIN [dbo].[BILL_Payment] AS BP ON BD.Payment_ID = BP.Payment_ID AND BP.Payment_RecordState <> 1 AND BP.Payment_ID <> '0000000000' 
+
+			WHERE  VB.Invoice_RecordState <> 1 AND VB.invoice_id <> '0000000000'  AND VB.Invoice_Date between '1/1/2017' AND '1/1/2018'  AND VB.InsuranceCompName LIKE 'BCBS%' AND VB.ProviderName LIKE 'Suter, %'
+			/*
+			GROUP BY VB.Invoice_Date ,BICPT.InvoiceCPT_Code,  BICPT.InvoiceCPT_ID, VB.ProviderName, VB.InsuranceCompName,
+					BICPT.InvoiceCPT_ModifierCode1, BICPT.InvoiceCPT_ModifierCode2, BICPT.InvoiceCPT_ModifierCode3, BICPT.InvoiceCPT_ModifierCode4 */
+			) 
+      AS T2 ON T1.Invoice_Date = T2.Invoice_Date AND T1.InvoiceCPT_Code = T2.InvoiceCPT_Code AND T1.Provider_Name = T2.Provider_Name AND T1.InsuranceCompName = T2.InsuranceCompName 
+			AND T1.Modifiers = T2.Modifiers AND T1.InvoiceCPT_ID = T2.InvoiceCPT_ID
+					
+
+WHERE T1.Invoice_Date >= '1/1/2016'
+ORDER BY T1.Invoice_Date, T1.Invoice_Number, T1.InvoiceCPT_Code
