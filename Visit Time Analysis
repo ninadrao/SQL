@@ -1,0 +1,41 @@
+/**************************************************************************************************
+* eMD’s Visit Time Analysis
+* -------------------------------
+* Created By Ninad Rao : 2018-02-19
+* - 2018-06-22 NR: Added First date and Last date of Insurance claim filed dates
+**************************************************************************************************/
+
+SELECT
+ a.appointment_id as 'Appointment #',
+ a.appointment_appstarttime as 'Start Time',
+ a.appointment_CheckIn as 'Checked In',
+ a.appointment_InRoom as 'In Room',
+ a.appointment_Diagnosis as 'Treatment',
+ a.appointment_CheckOut as 'Checked Out',
+ a.appointment_CheckOut - a.appointment_Diagnosis as 'Treatment Time',
+ b.person_name as 'Patient',
+ cc.visitcpt_code +
+  (CASE cc.cptmodifier_id1
+     WHEN '0000000000' THEN ''
+     ELSE '-'
+   END)
+   + ccm.cptmodifier_code as 'E&M Code',
+ d.person_name as 'Provider'
+ 
+FROM
+ APP_Appointment a
+ JOIN VIEW_Patient b on a.patient_id = b.patient_id
+ left JOIN CHRT_Visit c on (a.appointment_id = c.appointment_id) and c.visit_recordstate <> 1
+ left JOIN CHRT_Note n on (c.note_id = n.note_id) and n.note_recordstate <> 1
+ left JOIN CHRT_VisitCPT cc on (n.note_id = cc.note_id) and cc.visitcpt_recordstate <> 1
+ left JOIN CPT_CPTModifier ccm on (cc.cptmodifier_id1 = ccm.cptmodifier_id)
+ JOIN view_healthcare d on (c.healthcare_id = d.healthcare_id)
+
+WHERE
+ a.appointment_recordstate <> 1
+ and c.appointment_id <> '0000000000'
+-- and n.note_dateoccurred >= {?Note Start Date} and n.note_dateoccurred < {?Note End Date} + 1
+ and cc.visitcpt_code > '99200' and cc.visitcpt_code < '99500'
+-- and d.person_name like '{?Chart Healthcare Professional}%'
+
+
