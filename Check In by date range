@@ -1,0 +1,38 @@
+/**************************************************************************************************
+* eMD’s Check In by date range
+* -------------------------------
+* Created by Ninad Rao: 2017-09-19
+**************************************************************************************************/
+
+
+SELECT DISTINCT 
+  "VIEW_Patient"."Person_Name"
+  , "SECR_Login"."Login_Name"
+  , "APP_Appointment"."Appointment_AppStartTime"
+  , "APP_Appointment"."Appointment_CheckIn"
+  , "APP_Appointment"."Appointment_CheckOut"
+  , "APP_CheckInTask"."CheckInTask_Sequence"
+  , "VIEW_MedicalFacility"."Organization_Name"
+  
+ FROM   (((("TopsData"."dbo"."LINK_Appointment_CheckInTask" "LINK_Appointment_CheckInTask" 
+ 
+ INNER JOIN "TopsData"."dbo"."APP_Appointment" "APP_Appointment" 
+    ON "LINK_Appointment_CheckInTask"."Appointment_ID"="APP_Appointment"."Appointment_ID") 
+    
+ INNER JOIN "TopsData"."dbo"."APP_CheckInTask" "APP_CheckInTask" 
+    ON "LINK_Appointment_CheckInTask"."CheckInTask_ID"="APP_CheckInTask"."CheckInTask_ID") 
+    
+ INNER JOIN "TopsData"."dbo"."SECR_Login" "SECR_Login" 
+    ON "LINK_Appointment_CheckInTask"."Login_ID"="SECR_Login"."Login_ID") 
+    
+ INNER JOIN "TopsData"."dbo"."VIEW_Patient" "VIEW_Patient" 
+    ON "APP_Appointment"."Patient_ID"="VIEW_Patient"."Patient_ID") 
+    
+ INNER JOIN "TopsData"."dbo"."VIEW_MedicalFacility" "VIEW_MedicalFacility" 
+    ON "APP_Appointment"."MedicalFacility_ID"="VIEW_MedicalFacility"."MedicalFacility_ID"
+    
+ WHERE  "VIEW_Patient"."Person_Name" NOT  LIKE 'Dummy%' 
+     AND "SECR_Login"."Login_Name" LIKE '%' 
+     AND ("APP_Appointment"."Appointment_AppStartTime">={ts '2017-09-18 00:00:00'} 
+     AND "APP_Appointment"."Appointment_AppStartTime"<{ts '2017-09-19 00:00:00'}) 
+     AND "APP_CheckInTask"."CheckInTask_Sequence"=3
