@@ -1,0 +1,38 @@
+/**************************************************************************************************
+* Check In by Date Range
+* -------------------------------
+* Created by Ninad Rao
+**************************************************************************************************/
+
+SELECT DISTINCT 
+  VP."Person_Name"
+  , SL."Login_Name"
+  , A."Appointment_AppStartTime"
+  , A."Appointment_CheckIn"
+  , A."Appointment_CheckOut"
+  , AC."CheckInTask_Sequence"
+  , MF."Organization_Name"
+  
+ FROM   (((("TopsData"."dbo"."LINK_Appointment_CheckInTask" LINK_A 
+ 
+  INNER JOIN "TopsData"."dbo"."APP_Appointment" AS A 
+  ON LINK_A."Appointment_ID"= A."Appointment_ID") 
+  
+  INNER JOIN "TopsData"."dbo"."APP_CheckInTask" AC 
+  ON LINK_A."CheckInTask_ID"= AC."CheckInTask_ID") 
+  
+  INNER JOIN "TopsData"."dbo"."SECR_Login" AS SL 
+  ON LINK_A."Login_ID"= SL."Login_ID") 
+  
+  INNER JOIN "TopsData"."dbo"."VIEW_Patient" AS VP 
+  ON A."Patient_ID"= VP."Patient_ID") 
+  
+  INNER JOIN "TopsData"."dbo"."VIEW_MedicalFacility" AS MF 
+  ON A."MedicalFacility_ID" = MF."MedicalFacility_ID"
+  
+ WHERE  VP."Person_Name" NOT  LIKE 'Dummy%' 
+  AND SL."Login_Name" LIKE '%' 
+  AND (A."Appointment_AppStartTime">={ts '2017-09-18 00:00:00'} 
+  AND A."Appointment_AppStartTime"<{ts '2017-09-19 00:00:00'}) 
+  AND AC."CheckInTask_Sequence"=3
+  
